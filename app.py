@@ -108,7 +108,6 @@ with st.sidebar:
     - `daging sapi, serai, daun salam, jahe, kunyit, garam, bawang merah`
     - `jahe, daun jeruk, bawang putih`
     """)
-    st.warning("Pastikan file `master_resep.csv` dan `aturan_asosiasi_dict.json` ada di folder yang sama dengan aplikasi ini.")
 
 # Tampilan Utama
 st.title("Sistem Rekomendasi Resep")
