@@ -36,7 +36,7 @@ def muat_data(file_resep, file_aturan):
 
 def rekomendasi_resep(bahan_saya, df_resep, aturan_asosiasi, top_n=5):
     """
-    Fungsi inti untuk memberikan rekomendasi resep.
+    Fungsi inti untuk memberikan rekomendasi resep dengan logika saran cerdas yang baru.
     """
     bahan_saya_set = set(bahan.strip().lower() for bahan in bahan_saya)
     hasil_rekomendasi = []
@@ -56,14 +56,25 @@ def rekomendasi_resep(bahan_saya, df_resep, aturan_asosiasi, top_n=5):
             skor_cocok = 0
 
         if skor_cocok > 0:
+            # --- LOGIKA BARU UNTUK SARAN CERDAS ---
+            # Tujuannya adalah menyarankan bahan yang TIDAK ADA di resep ini,
+            # tetapi cocok berdasarkan bahan yang dimiliki pengguna untuk resep ini.
             saran_cerdas_list = []
-            for bahan in bahan_kurang:
-                for antecedent_str, consequent in aturan_asosiasi.items():
-                    antecedent = set(antecedent_str.split(','))
-                    if antecedent.issubset(bahan_cocok) and consequent == bahan:
-                        # Mengubah kalimat saran sesuai permintaan
-                        saran = f"Sebagian besar bahan yang Anda miliki biasa digunakan dengan **'{consequent}'**. Mungkin Anda bisa sekalian membelinya."
-                        saran_cerdas_list.append(saran)
+            bahan_disarankan = set() # Untuk menghindari saran duplikat
+
+            for antecedent_str, consequent in aturan_asosiasi.items():
+                antecedent = set(antecedent_str.split(','))
+                
+                # Kondisi 1: Aturan terpicu oleh bahan yang cocok
+                # Kondisi 2: Bahan yang disarankan (consequent) BUKAN bagian dari resep asli
+                # Kondisi 3: Bahan yang disarankan belum pernah disarankan sebelumnya
+                if antecedent.issubset(bahan_cocok) and consequent not in bahan_resep_set and consequent not in bahan_disarankan:
+                    saran = f"`{', '.join(antecedent)}` banyak digunakan dengan **`{consequent}`**, Anda mungkin juga tertarik untuk membeli **`{consequent}`** sebagai pelengkap."
+                    saran_cerdas_list.append(saran)
+                    bahan_disarankan.add(consequent)
+                    
+                    # Batasi jumlah saran agar tidak terlalu banyak
+                    if len(saran_cerdas_list) >= 2:
                         break
             
             rekomendasi = {
@@ -95,7 +106,7 @@ with st.sidebar:
     Coba salin dan tempel contoh di bawah ini ke dalam kotak input:
     - `bawang putih, bawang merah, garam, kecap manis, nasi, merica, telur`
     - `daging sapi, serai, daun salam, jahe, kunyit, garam, bawang merah`
-    - `tepung terigu, telur, gula, mentega`
+    - `jahe, daun jeruk, bawang putih`
     """)
     st.warning("Pastikan file `master_resep.csv` dan `aturan_asosiasi_dict.json` ada di folder yang sama dengan aplikasi ini.")
 
@@ -120,7 +131,8 @@ if df_resep is not None and aturan_asosiasi is not None:
             bahan_pengguna = [bahan.strip().lower() for bahan in re.split(r'[,\n]', input_bahan_str) if bahan.strip()]
             
             with st.spinner("Mencari resep terbaik untuk Anda..."):
-                rekomendasi = rekomendasi_resep(bahan_pengguna, df_resep, aturan_asosiasi, top_n=3)
+                # Mengubah top_n menjadi 5
+                rekomendasi = rekomendasi_resep(bahan_pengguna, df_resep, aturan_asosiasi, top_n=5)
 
             st.success("Pencarian Selesai!")
             st.markdown("---")
@@ -143,7 +155,7 @@ if df_resep is not None and aturan_asosiasi is not None:
                             st.metric(label="Kecocokan", value=f"{resep['skor_cocok_persen']}%")
                         
                         # Expander untuk detail
-                        with st.expander("Lihat Detail Kebutuhan Bahan"):
+                        with st.expander("Lihat Detail Kebutuhan & Saran"):
                             if resep['bahan_kurang']:
                                 st.write("**Bahan yang Perlu Dibeli:**")
                                 for bahan in resep['bahan_kurang']:
@@ -151,8 +163,10 @@ if df_resep is not None and aturan_asosiasi is not None:
                             else:
                                 st.success("🎉 Selamat! Anda memiliki semua bahan yang diperlukan.")
                             
+                            # Menampilkan Saran Cerdas dengan logika baru
                             if resep['saran_cerdas']:
-                                st.write("**Saran Cerdas:**")
+                                st.write("---") # Pemisah visual
+                                st.write("**Rekomendasi Pelengkap:**")
                                 for saran in resep['saran_cerdas']:
                                     st.markdown(f"💡 {saran}")
                     st.write("") # Memberi sedikit spasi
